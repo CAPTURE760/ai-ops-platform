@@ -462,6 +462,190 @@
       word-break: break-all;
     }
 
+    /* Log analysis card */
+    .log-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .log-search {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .log-search:focus { border-color: #3b82f6; }
+    .log-filter {
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .log-filter option { background: #1e293b; }
+    .log-table-wrap {
+      max-height: 300px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .log-table th {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      padding: 8px 12px;
+      text-align: left;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 11px;
+    }
+    .log-table td {
+      padding: 6px 12px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      color: #94a3b8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .log-table tr:hover td { background: rgba(255,255,255,0.03); }
+    .log-level-info { color: #3b82f6; }
+    .log-level-warning { color: #f59e0b; }
+    .log-level-error { color: #ef4444; }
+    .log-stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .log-stat-item {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+    }
+    .log-stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .log-stat-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    /* Automation ops card */
+    .ops-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .ops-preset-btn {
+      padding: 6px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 6px;
+      color: #60a5fa;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ops-preset-btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+    .ops-preset-btn .desc {
+      display: none;
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    .ops-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .ops-input {
+      flex: 1;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      outline: none;
+    }
+    .ops-input:focus { border-color: #3b82f6; }
+    .ops-exec-btn {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .ops-exec-btn:hover { opacity: 0.9; }
+    .ops-exec-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ops-result {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .ops-result .cmd-line {
+      color: #22c55e;
+      margin-bottom: 8px;
+    }
+    .ops-result .error-line {
+      color: #ef4444;
+    }
+    .ops-history {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .ops-history-item {
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .ops-history-item:hover { color: #94a3b8; }
+
     /* Alert bar */
     .alert-bar {
       display: none;
@@ -799,6 +983,78 @@
         <tr><td colspan="4" class="loading"><span class="spinner"></span> 加载中...</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Log Analysis -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-title">
+      <span class="icon" style="background:#06b6d420;color:#06b6d4">L</span>
+      日志分析
+    </div>
+    <div class="log-controls">
+      <input type="text" class="log-search" id="log-keyword" placeholder="搜索关键词..." onkeyup="if(event.key==='Enter')fetchLogs()">
+      <select class="log-filter" id="log-source-filter" onchange="fetchLogs()">
+        <option value="">全部来源</option>
+        <option value="docker">Docker</option>
+        <option value="service">服务</option>
+      </select>
+      <select class="log-filter" id="log-level-filter" onchange="fetchLogs()">
+        <option value="">全部级别</option>
+        <option value="error">错误</option>
+        <option value="warning">警告</option>
+        <option value="info">信息</option>
+      </select>
+    </div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th style="width:140px">时间</th>
+            <th style="width:80px">来源</th>
+            <th style="width:60px">级别</th>
+            <th>消息</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          <tr><td colspan="4" class="loading"><span class="spinner"></span> 加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="log-stats" id="log-stats">
+      <div class="log-stat-item">
+        <div class="log-stat-value" id="log-total">-</div>
+        <div class="log-stat-label">总日志数</div>
+      </div>
+      <div class="log-stat-item">
+        <div class="log-stat-value log-level-error" id="log-errors">-</div>
+        <div class="log-stat-label">错误数</div>
+      </div>
+      <div class="log-stat-item">
+        <div class="log-stat-value log-level-warning" id="log-warnings">-</div>
+        <div class="log-stat-label">警告数</div>
+      </div>
+      <div class="log-stat-item">
+        <div class="log-stat-value" id="log-docker-count">-</div>
+        <div class="log-stat-label">Docker 日志</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Automation Ops -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-title">
+      <span class="icon" style="background:#8b5cf620;color:#8b5cf6">A</span>
+      自动化运维
+    </div>
+    <div class="ops-presets" id="ops-presets">
+      <span style="color:#64748b;font-size:12px">加载预设命令...</span>
+    </div>
+    <div class="ops-input-row">
+      <input type="text" class="ops-input" id="ops-cmd" placeholder="输入命令或选择预设..." onkeyup="if(event.key==='Enter')executeCmd()">
+      <button class="ops-exec-btn" id="ops-exec-btn" onclick="executeCmd()">执行</button>
+    </div>
+    <div class="ops-result" id="ops-result" style="display:none;"></div>
+    <div class="ops-history" id="ops-history"></div>
   </div>
 </div>
 
@@ -1139,18 +1395,158 @@ async function fetchHistory() {
   }
 }
 
+// --- Log Analysis ---
+async function fetchLogs() {
+  try {
+    const keyword = document.getElementById('log-keyword').value;
+    const source = document.getElementById('log-source-filter').value;
+    const level = document.getElementById('log-level-filter').value;
+    let url = API + '/logs?limit=100';
+    if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+    if (source) url += '&source=' + source;
+    if (level) url += '&level=' + level;
+    const r = await fetch(url);
+    const d = await r.json();
+    const el = document.getElementById('log-body');
+    if (!d.logs || d.logs.length === 0) {
+      el.innerHTML = '<tr><td colspan="4" class="empty">暂无日志</td></tr>';
+      return;
+    }
+    el.innerHTML = d.logs.map(log => {
+      const t = new Date(log.ts * 1000);
+      const time = t.toLocaleString('zh-CN', { hour12: false });
+      const levelCls = 'log-level-' + log.level;
+      const sourceLabel = log.source === 'docker' ? 'Docker' : '服务';
+      const container = log.container ? ` (${log.container})` : '';
+      return `<tr>
+        <td>${time}</td>
+        <td>${sourceLabel}${container}</td>
+        <td class="${levelCls}">${log.level}</td>
+        <td title="${esc(log.message)}">${esc(log.message)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    console.error('logs', e);
+  }
+}
+
+async function fetchLogStats() {
+  try {
+    const r = await fetch(API + '/logs/stats');
+    const d = await r.json();
+    const total = Object.values(d.by_level).reduce((a, b) => a + b, 0);
+    document.getElementById('log-total').textContent = total;
+    document.getElementById('log-errors').textContent = d.by_level.error || 0;
+    document.getElementById('log-warnings').textContent = d.by_level.warning || 0;
+    document.getElementById('log-docker-count').textContent = d.by_source.docker || 0;
+  } catch (e) {
+    console.error('log stats', e);
+  }
+}
+
+// --- Automation Ops ---
+let opsPresets = [];
+let opsHistory = [];
+
+async function fetchPresets() {
+  try {
+    const r = await fetch(API + '/ops/presets');
+    const d = await r.json();
+    opsPresets = d.presets;
+    const el = document.getElementById('ops-presets');
+    el.innerHTML = opsPresets.map(p =>
+      `<button class="ops-preset-btn" onclick="selectPreset('${p.id}')" title="${esc(p.desc)}">${esc(p.name)}</button>`
+    ).join('');
+  } catch (e) {
+    console.error('presets', e);
+    document.getElementById('ops-presets').innerHTML = '<span style="color:#ef4444;font-size:12px">加载失败</span>';
+  }
+}
+
+function selectPreset(id) {
+  const preset = opsPresets.find(p => p.id === id);
+  if (!preset) return;
+  document.getElementById('ops-cmd').value = preset.cmd;
+  // Show description tooltip
+  const el = document.getElementById('ops-result');
+  el.style.display = 'block';
+  el.innerHTML = `<span style="color:#60a5fa">说明：${esc(preset.desc)}</span>\n<span style="color:#64748b">命令：${esc(preset.cmd)}</span>\n<span style="color:#64748b">按 Enter 或点击执行按钮运行</span>`;
+}
+
+async function executeCmd() {
+  const input = document.getElementById('ops-cmd');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+
+  const btn = document.getElementById('ops-exec-btn');
+  const resultEl = document.getElementById('ops-result');
+  btn.disabled = true;
+  btn.textContent = '执行中...';
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `<span style="color:#60a5fa">$ ${esc(cmd)}</span>\n执行中...`;
+
+  try {
+    // Check if it's a preset command
+    const preset = opsPresets.find(p => p.cmd === cmd);
+    const body = preset ? { preset_id: preset.id } : { cmd: cmd };
+
+    const r = await fetch(API + '/ops/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+
+    if (!r.ok) {
+      resultEl.innerHTML = `<span class="error-line">错误：${esc(d.detail || '执行失败')}</span>`;
+    } else {
+      const output = d.stdout || '(无输出)';
+      resultEl.innerHTML = `<span class="cmd-line">$ ${esc(d.cmd)}</span>\n${esc(output)}`;
+      // Add to history
+      opsHistory.unshift({ cmd: d.cmd, time: new Date(), success: d.success });
+      if (opsHistory.length > 10) opsHistory.pop();
+      renderOpsHistory();
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<span class="error-line">请求失败：${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '执行';
+  }
+}
+
+function renderOpsHistory() {
+  const el = document.getElementById('ops-history');
+  if (opsHistory.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = '<div style="margin-bottom:4px">最近执行：</div>' +
+    opsHistory.map(h =>
+      `<div class="ops-history-item" onclick="document.getElementById('ops-cmd').value='${esc(h.cmd)}'">
+        ${h.success ? '&#10003;' : '&#10007;'} ${esc(h.cmd)}
+        <span style="float:right">${h.time.toLocaleTimeString('zh-CN')}</span>
+      </div>`
+    ).join('');
+}
+
 // --- Polling ---
 fetchSystem();
 fetchNetwork();
 fetchDocker();
 fetchProcesses();
 fetchHistory();
+fetchLogs();
+fetchLogStats();
+fetchPresets();
 
 setInterval(fetchSystem, 3000);
 setInterval(fetchNetwork, 3000);
 setInterval(fetchDocker, 10000);
 setInterval(fetchProcesses, 5000);
 setInterval(fetchHistory, 30000);
+setInterval(fetchLogs, 30000);
+setInterval(fetchLogStats, 30000);
 </script>
 </body>
 </html>

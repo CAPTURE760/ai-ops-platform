@@ -4,6 +4,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./backend:/app
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
     healthcheck:
