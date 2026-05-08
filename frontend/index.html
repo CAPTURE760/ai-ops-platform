@@ -397,8 +397,15 @@
 </div>
 
 <script>
-const API = 'http://localhost:8000';
+const API = window.APP_API_URL || (window.location.origin + '/api');
 const C = 2 * Math.PI * 58; // ~364.42
+
+// --- XSS protection ---
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
 
 // --- Chart setup ---
 const ctx = document.getElementById('trendChart').getContext('2d');
@@ -510,9 +517,9 @@ async function fetchDocker() {
       else if (s === 'paused') cls = 'paused';
       return `<div class="container-item">
         <div class="container-status status-${cls}"></div>
-        <div class="container-name">${c.name}</div>
-        <div class="container-image">${c.image}</div>
-        <div class="container-status-text text-${cls}">${s}</div>
+        <div class="container-name">${esc(c.name)}</div>
+        <div class="container-image">${esc(c.image)}</div>
+        <div class="container-status-text text-${cls}">${esc(s)}</div>
       </div>`;
     }).join('');
   } catch (e) { console.error('docker', e); }
@@ -535,7 +542,7 @@ async function fetchProcesses() {
       const memColor = mem > 50 ? '#ef4444' : mem > 20 ? '#f59e0b' : '#8b5cf6';
       return `<tr>
         <td style="font-family:monospace;color:#64748b">${p.pid}</td>
-        <td>${p.name}</td>
+        <td>${esc(p.name)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="proc-bar"><div class="proc-bar-inner" style="width:${Math.min(cpu, 100)}%;background:${cpuColor}"></div></div>
