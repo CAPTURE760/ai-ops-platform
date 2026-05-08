@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Ops Platform</title>
+  <style>
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+    h1 { color: #38bdf8; margin-bottom: 40px; }
+    .cards {
+      display: flex;
+      gap: 24px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 32px;
+      width: 160px;
+      text-align: center;
+    }
+    .card .label {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .card .value {
+      font-size: 48px;
+      font-weight: bold;
+      color: #38bdf8;
+    }
+    .card .unit {
+      font-size: 14px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <h1>🖥️ 系统监控</h1>
+  <div class="cards">
+    <div class="card">
+      <div class="label">CPU</div>
+      <div class="value" id="cpu">--</div>
+      <div class="unit">%</div>
+    </div>
+    <div class="card">
+      <div class="label">内存</div>
+      <div class="value" id="memory">--</div>
+      <div class="unit">%</div>
+    </div>
+    <div class="card">
+      <div class="label">磁盘</div>
+      <div class="value" id="disk">--</div>
+      <div class="unit">%</div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchData() {
+      try {
+        const res = await fetch('http://localhost:8000/system');
+        const data = await res.json();
+        document.getElementById('cpu').textContent = data.cpu;
+        document.getElementById('memory').textContent = data.memory;
+        document.getElementById('disk').textContent = data.disk;
+      } catch (e) {
+        console.error('获取数据失败', e);
+      }
+    }
+
+    fetchData();
+    setInterval(fetchData, 3000); // 每3秒刷新
+  </script>
+</body>
+</html>
