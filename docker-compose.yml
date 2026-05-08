@@ -5,4 +5,13 @@ services:
       - "8000:8000"
     volumes:
       - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
     restart: unless-stopped

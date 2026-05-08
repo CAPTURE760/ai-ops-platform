@@ -2,80 +2,585 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Ops Platform</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #0f172a;
+      background: #0b1120;
       color: #e2e8f0;
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background: #111827;
+      border-bottom: 1px solid #1e293b;
+    }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header h1 .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #22c55e; display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .header .time {
+      font-size: 13px;
+      color: #64748b;
       font-family: monospace;
+    }
+
+    /* Grid Layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding: 24px 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Cards */
+    .card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #334155; }
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+
+    /* Gauges Row */
+    .gauges-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .gauge-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 28px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px;
+      transition: border-color 0.2s;
     }
-    h1 { color: #38bdf8; margin-bottom: 40px; }
-    .cards {
+    .gauge-card:hover { border-color: #334155; }
+    .gauge-wrap {
+      position: relative;
+      width: 140px;
+      height: 140px;
+    }
+    .gauge-wrap svg {
+      transform: rotate(-90deg);
+    }
+    .gauge-bg {
+      fill: none;
+      stroke: #1e293b;
+      stroke-width: 10;
+    }
+    .gauge-fg {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s ease, stroke 0.4s;
+    }
+    .gauge-value {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: 700;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .gauge-unit {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 400;
+    }
+    .gauge-label {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .gauge-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    /* Colors */
+    .color-normal { stroke: #3b82f6; color: #3b82f6; }
+    .color-warning { stroke: #f59e0b; color: #f59e0b; }
+    .color-danger { stroke: #ef4444; color: #ef4444; }
+
+    /* Chart */
+    .chart-card {
+      grid-column: 1 / -1;
+    }
+    .chart-container {
+      position: relative;
+      height: 220px;
+    }
+
+    /* Network */
+    .net-stats {
       display: flex;
       gap: 24px;
     }
-    .card {
-      background: #1e293b;
-      border-radius: 12px;
-      padding: 32px;
-      width: 160px;
+    .net-item {
+      flex: 1;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 16px;
       text-align: center;
     }
-    .card .label {
-      font-size: 14px;
-      color: #94a3b8;
-      margin-bottom: 12px;
-    }
-    .card .value {
-      font-size: 48px;
-      font-weight: bold;
-      color: #38bdf8;
-    }
-    .card .unit {
-      font-size: 14px;
+    .net-item .net-label {
+      font-size: 12px;
       color: #64748b;
+      margin-bottom: 8px;
+    }
+    .net-item .net-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .net-item .net-unit {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 2px;
+    }
+    .net-up { color: #22c55e; }
+    .net-down { color: #3b82f6; }
+
+    /* Docker containers */
+    .container-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .container-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #0f172a;
+      border-radius: 8px;
+    }
+    .container-status {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-running { background: #22c55e; box-shadow: 0 0 6px #22c55e80; }
+    .status-exited { background: #ef4444; }
+    .status-paused { background: #f59e0b; }
+    .status-other { background: #64748b; }
+    .container-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .container-image {
+      font-size: 12px;
+      color: #64748b;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .container-status-text {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .text-running { background: #22c55e20; color: #22c55e; }
+    .text-exited { background: #ef444420; color: #ef4444; }
+    .text-paused { background: #f59e0b20; color: #f59e0b; }
+    .text-other { background: #64748b20; color: #64748b; }
+
+    /* Process table */
+    .proc-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .proc-table th {
+      text-align: left;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .proc-table td {
+      font-size: 13px;
+      padding: 10px 12px;
+      border-bottom: 1px solid #1e293b10;
+      color: #cbd5e1;
+    }
+    .proc-table tr:last-child td { border-bottom: none; }
+    .proc-bar {
+      height: 4px;
+      background: #1e293b;
+      border-radius: 2px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+    .proc-bar-inner {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      color: #475569;
+      padding: 32px;
+      font-size: 14px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .dashboard { grid-template-columns: 1fr; padding: 16px; }
+      .gauges-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <h1>🖥️ 系统监控</h1>
-  <div class="cards">
-    <div class="card">
-      <div class="label">CPU</div>
-      <div class="value" id="cpu">--</div>
-      <div class="unit">%</div>
+
+<div class="header">
+  <h1><span class="dot"></span> AI Ops Platform</h1>
+  <div class="time" id="clock">--</div>
+</div>
+
+<div class="dashboard">
+  <!-- Gauges -->
+  <div class="gauges-row">
+    <div class="gauge-card">
+      <div class="gauge-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
+          <circle class="gauge-fg color-normal" id="cpu-gauge" cx="70" cy="70" r="58"
+            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        </svg>
+        <div class="gauge-value color-normal" id="cpu-val">--</div>
+      </div>
+      <div class="gauge-label">CPU</div>
+      <div class="gauge-sub" id="cpu-sub">--</div>
     </div>
-    <div class="card">
-      <div class="label">内存</div>
-      <div class="value" id="memory">--</div>
-      <div class="unit">%</div>
+    <div class="gauge-card">
+      <div class="gauge-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
+          <circle class="gauge-fg color-normal" id="mem-gauge" cx="70" cy="70" r="58"
+            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        </svg>
+        <div class="gauge-value color-normal" id="mem-val">--</div>
+      </div>
+      <div class="gauge-label">内存</div>
+      <div class="gauge-sub" id="mem-sub">--</div>
     </div>
-    <div class="card">
-      <div class="label">磁盘</div>
-      <div class="value" id="disk">--</div>
-      <div class="unit">%</div>
+    <div class="gauge-card">
+      <div class="gauge-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
+          <circle class="gauge-fg color-normal" id="disk-gauge" cx="70" cy="70" r="58"
+            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        </svg>
+        <div class="gauge-value color-normal" id="disk-val">--</div>
+      </div>
+      <div class="gauge-label">磁盘</div>
+      <div class="gauge-sub" id="disk-sub">--</div>
     </div>
   </div>
 
-  <script>
-    async function fetchData() {
-      try {
-        const res = await fetch('http://localhost:8000/system');
-        const data = await res.json();
-        document.getElementById('cpu').textContent = data.cpu;
-        document.getElementById('memory').textContent = data.memory;
-        document.getElementById('disk').textContent = data.disk;
-      } catch (e) {
-        console.error('获取数据失败', e);
-      }
-    }
+  <!-- Trend Chart -->
+  <div class="card chart-card">
+    <div class="card-title">趋势 (最近60条记录)</div>
+    <div class="chart-container">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
 
-    fetchData();
-    setInterval(fetchData, 3000); // 每3秒刷新
-  </script>
+  <!-- Network -->
+  <div class="card">
+    <div class="card-title">网络流量</div>
+    <div class="net-stats">
+      <div class="net-item">
+        <div class="net-label">上传速度</div>
+        <div class="net-value net-up" id="net-up">--</div>
+        <div class="net-unit">KB/s</div>
+      </div>
+      <div class="net-item">
+        <div class="net-label">下载速度</div>
+        <div class="net-value net-down" id="net-down">--</div>
+        <div class="net-unit">KB/s</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; margin-top:16px;">
+      <div class="net-item" style="flex:1">
+        <div class="net-label">累计上传</div>
+        <div class="net-value net-up" id="net-total-up" style="font-size:16px">--</div>
+      </div>
+      <div class="net-item" style="flex:1">
+        <div class="net-label">累计下载</div>
+        <div class="net-value net-down" id="net-total-down" style="font-size:16px">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Docker -->
+  <div class="card">
+    <div class="card-title">Docker 容器</div>
+    <div class="container-list" id="docker-list">
+      <div class="empty">加载中...</div>
+    </div>
+  </div>
+
+  <!-- Processes -->
+  <div class="card">
+    <div class="card-title">Top 5 进程 (CPU)</div>
+    <table class="proc-table">
+      <thead>
+        <tr>
+          <th>PID</th>
+          <th>进程名</th>
+          <th>CPU</th>
+          <th>内存</th>
+        </tr>
+      </thead>
+      <tbody id="proc-body">
+        <tr><td colspan="4" class="empty">加载中...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const C = 2 * Math.PI * 58; // ~364.42
+
+// --- Chart setup ---
+const ctx = document.getElementById('trendChart').getContext('2d');
+const trendChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'CPU', data: [], borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+      { label: '内存', data: [], borderColor: '#8b5cf6', backgroundColor: '#8b5cf620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 300 },
+    scales: {
+      x: { display: true, grid: { color: '#1e293b' }, ticks: { color: '#475569', maxTicksLimit: 10, font: { size: 10 } } },
+      y: { min: 0, max: 100, grid: { color: '#1e293b' }, ticks: { color: '#475569', callback: v => v + '%' } }
+    },
+    plugins: {
+      legend: { labels: { color: '#94a3b8', usePointStyle: true, pointStyle: 'circle', padding: 16 } },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false }
+  }
+});
+
+// --- Helpers ---
+function gaugeColor(val) {
+  if (val >= 80) return 'color-danger';
+  if (val >= 60) return 'color-warning';
+  return 'color-normal';
+}
+
+function setGauge(id, val) {
+  const fg = document.getElementById(id + '-gauge');
+  const label = document.getElementById(id + '-val');
+  const cls = gaugeColor(val);
+  fg.className.baseVal = 'gauge-fg ' + cls;
+  label.className = 'gauge-value ' + cls;
+  fg.style.strokeDashoffset = C - (C * val / 100);
+  label.textContent = Math.round(val);
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b.toFixed(0) + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+
+function formatSpeed(b) {
+  if (b < 1024) return b.toFixed(0);
+  if (b < 1048576) return (b / 1024).toFixed(1);
+  return (b / 1048576).toFixed(2);
+}
+
+// --- Clock ---
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('zh-CN') + ' ' + now.toLocaleTimeString('zh-CN');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// --- Fetch System ---
+async function fetchSystem() {
+  try {
+    const r = await fetch(API + '/system');
+    const d = await r.json();
+    setGauge('cpu', d.cpu);
+    setGauge('mem', d.memory);
+    setGauge('disk', d.disk);
+    document.getElementById('cpu-sub').textContent = '使用率';
+    document.getElementById('mem-sub').textContent = '使用率';
+    document.getElementById('disk-sub').textContent = '使用率';
+  } catch (e) { console.error('system', e); }
+}
+
+// --- Fetch Network ---
+async function fetchNetwork() {
+  try {
+    const r = await fetch(API + '/network');
+    const d = await r.json();
+    document.getElementById('net-up').textContent = formatSpeed(d.sent_speed);
+    document.getElementById('net-down').textContent = formatSpeed(d.recv_speed);
+    document.getElementById('net-total-up').textContent = formatBytes(d.bytes_sent);
+    document.getElementById('net-total-down').textContent = formatBytes(d.bytes_recv);
+  } catch (e) { console.error('network', e); }
+}
+
+// --- Fetch Docker ---
+async function fetchDocker() {
+  try {
+    const r = await fetch(API + '/docker');
+    const d = await r.json();
+    const el = document.getElementById('docker-list');
+    if (!d.containers || d.containers.length === 0) {
+      el.innerHTML = '<div class="empty">没有容器</div>';
+      return;
+    }
+    el.innerHTML = d.containers.map(c => {
+      const s = c.status;
+      let cls = 'other';
+      if (s === 'running') cls = 'running';
+      else if (s === 'exited') cls = 'exited';
+      else if (s === 'paused') cls = 'paused';
+      return `<div class="container-item">
+        <div class="container-status status-${cls}"></div>
+        <div class="container-name">${c.name}</div>
+        <div class="container-image">${c.image}</div>
+        <div class="container-status-text text-${cls}">${s}</div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error('docker', e); }
+}
+
+// --- Fetch Processes ---
+async function fetchProcesses() {
+  try {
+    const r = await fetch(API + '/processes');
+    const d = await r.json();
+    const el = document.getElementById('proc-body');
+    if (!d.processes || d.processes.length === 0) {
+      el.innerHTML = '<tr><td colspan="4" class="empty">无数据</td></tr>';
+      return;
+    }
+    el.innerHTML = d.processes.map(p => {
+      const cpu = (p.cpu_percent || 0).toFixed(1);
+      const mem = (p.memory_percent || 0).toFixed(1);
+      const cpuColor = cpu > 50 ? '#ef4444' : cpu > 20 ? '#f59e0b' : '#3b82f6';
+      const memColor = mem > 50 ? '#ef4444' : mem > 20 ? '#f59e0b' : '#8b5cf6';
+      return `<tr>
+        <td style="font-family:monospace;color:#64748b">${p.pid}</td>
+        <td>${p.name}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="proc-bar"><div class="proc-bar-inner" style="width:${Math.min(cpu, 100)}%;background:${cpuColor}"></div></div>
+            <span style="font-family:monospace;min-width:40px">${cpu}%</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="proc-bar"><div class="proc-bar-inner" style="width:${Math.min(mem, 100)}%;background:${memColor}"></div></div>
+            <span style="font-family:monospace;min-width:40px">${mem}%</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) { console.error('processes', e); }
+}
+
+// --- Fetch History ---
+async function fetchHistory() {
+  try {
+    const r = await fetch(API + '/history');
+    const d = await r.json();
+    if (!d.history || d.history.length === 0) return;
+    trendChart.data.labels = d.history.map(h => {
+      const t = new Date(h.ts * 1000);
+      return t.getHours().toString().padStart(2, '0') + ':' + t.getMinutes().toString().padStart(2, '0');
+    });
+    trendChart.data.datasets[0].data = d.history.map(h => h.cpu);
+    trendChart.data.datasets[1].data = d.history.map(h => h.memory);
+    trendChart.update('none');
+  } catch (e) { console.error('history', e); }
+}
+
+// --- Polling ---
+fetchSystem();
+fetchNetwork();
+fetchDocker();
+fetchProcesses();
+fetchHistory();
+
+setInterval(fetchSystem, 3000);
+setInterval(fetchNetwork, 3000);
+setInterval(fetchDocker, 10000);
+setInterval(fetchProcesses, 5000);
+setInterval(fetchHistory, 30000);
+</script>
 </body>
 </html>
