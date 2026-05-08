@@ -5,13 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Ops Platform</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #0b1120;
+      background: #060a13;
       color: #e2e8f0;
-      font-family: 'Segoe UI', -apple-system, sans-serif;
+      font-family: 'Inter', -apple-system, sans-serif;
       min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 20% 50%, #0ea5e920 0%, transparent 40%),
+                  radial-gradient(circle at 80% 20%, #8b5cf620 0%, transparent 40%),
+                  radial-gradient(circle at 50% 80%, #06b6d415 0%, transparent 40%);
+      animation: bgMove 20s ease-in-out infinite;
+      z-index: -1;
+    }
+    @keyframes bgMove {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(-2%, 1%); }
+      66% { transform: translate(1%, -2%); }
     }
 
     /* Header */
@@ -20,13 +41,19 @@
       align-items: center;
       justify-content: space-between;
       padding: 16px 32px;
-      background: #111827;
-      border-bottom: 1px solid #1e293b;
+      background: rgba(17, 24, 39, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .header h1 {
       font-size: 20px;
-      font-weight: 600;
-      color: #f1f5f9;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -35,43 +62,105 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: #22c55e; display: inline-block;
       animation: pulse 2s infinite;
+      box-shadow: 0 0 8px #22c55e80;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px #22c55e80; }
+      50% { opacity: 0.5; box-shadow: 0 0 16px #22c55e60; }
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
     }
     .header .time {
       font-size: 13px;
       color: #64748b;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .last-update {
+      font-size: 11px;
+      color: #475569;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.05);
     }
 
-    /* Grid Layout */
+    /* Error banner */
+    .error-banner {
+      display: none;
+      background: linear-gradient(90deg, #7f1d1d, #991b1b);
+      color: #fecaca;
+      padding: 10px 32px;
+      font-size: 13px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+    }
+    .error-banner button {
+      margin-left: 16px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(254,202,202,0.3);
+      color: #fecaca;
+      padding: 2px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+    .error-banner button:hover { background: rgba(255,255,255,0.2); }
+
+    /* Dashboard grid */
     .dashboard {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       padding: 24px 32px;
-      max-width: 1400px;
+      max-width: 1500px;
       margin: 0 auto;
     }
 
-    /* Cards */
+    /* Glass cards */
     .card {
-      background: #111827;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
       padding: 24px;
-      transition: border-color 0.2s;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
-    .card:hover { border-color: #334155; }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    }
+    .card:hover {
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
     .card-title {
-      font-size: 13px;
-      font-weight: 500;
-      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .icon {
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
     }
 
     /* Gauges Row */
@@ -82,129 +171,169 @@
       gap: 20px;
     }
     .gauge-card {
-      background: #111827;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 28px;
+      background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 32px 28px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      transition: border-color 0.2s;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
-    .gauge-card:hover { border-color: #334155; }
+    .gauge-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    }
+    .gauge-card:hover {
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
     .gauge-wrap {
       position: relative;
-      width: 140px;
-      height: 140px;
+      width: 150px;
+      height: 150px;
     }
     .gauge-wrap svg {
       transform: rotate(-90deg);
+      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.3));
     }
     .gauge-bg {
       fill: none;
-      stroke: #1e293b;
-      stroke-width: 10;
+      stroke: rgba(255,255,255,0.05);
+      stroke-width: 12;
     }
     .gauge-fg {
       fill: none;
-      stroke-width: 10;
+      stroke-width: 12;
       stroke-linecap: round;
-      transition: stroke-dashoffset 0.6s ease, stroke 0.4s;
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s;
     }
     .gauge-value {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 32px;
+      font-size: 36px;
       font-weight: 700;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'JetBrains Mono', monospace;
     }
     .gauge-unit {
-      font-size: 14px;
+      font-size: 16px;
       color: #64748b;
       font-weight: 400;
     }
     .gauge-label {
-      margin-top: 12px;
-      font-size: 14px;
+      margin-top: 16px;
+      font-size: 15px;
       color: #94a3b8;
-      font-weight: 500;
+      font-weight: 600;
+      letter-spacing: 0.5px;
     }
     .gauge-sub {
-      margin-top: 4px;
+      margin-top: 6px;
       font-size: 12px;
       color: #475569;
+      font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Colors */
-    .color-normal { stroke: #3b82f6; color: #3b82f6; }
-    .color-warning { stroke: #f59e0b; color: #f59e0b; }
-    .color-danger { stroke: #ef4444; color: #ef4444; }
+    /* Gauge colors with glow */
+    .color-normal { stroke: #3b82f6; color: #3b82f6; filter: drop-shadow(0 0 6px #3b82f640); }
+    .color-warning { stroke: #f59e0b; color: #f59e0b; filter: drop-shadow(0 0 6px #f59e0b40); }
+    .color-danger { stroke: #ef4444; color: #ef4444; filter: drop-shadow(0 0 6px #ef444440); }
 
     /* Chart */
-    .chart-card {
-      grid-column: 1 / -1;
-    }
+    .chart-card { grid-column: 1 / -1; }
     .chart-container {
       position: relative;
-      height: 220px;
+      height: 240px;
     }
 
     /* Network */
     .net-stats {
-      display: flex;
-      gap: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
     }
     .net-item {
-      flex: 1;
-      background: #0f172a;
-      border-radius: 8px;
-      padding: 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      padding: 20px;
       text-align: center;
+      border: 1px solid rgba(255,255,255,0.04);
+      transition: all 0.3s;
+    }
+    .net-item:hover {
+      border-color: rgba(255,255,255,0.08);
+      background: rgba(15, 23, 42, 0.8);
     }
     .net-item .net-label {
-      font-size: 12px;
+      font-size: 11px;
       color: #64748b;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
     }
     .net-item .net-value {
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 700;
-      font-family: monospace;
+      font-family: 'JetBrains Mono', monospace;
     }
     .net-item .net-unit {
       font-size: 12px;
       color: #475569;
-      margin-top: 2px;
+      margin-top: 4px;
     }
     .net-up { color: #22c55e; }
     .net-down { color: #3b82f6; }
+    .net-totals {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
 
     /* Docker containers */
     .container-list {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-height: 300px;
+      max-height: 320px;
       overflow-y: auto;
     }
     .container-item {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 16px;
-      background: #0f172a;
-      border-radius: 8px;
+      padding: 14px 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      transition: all 0.2s;
+    }
+    .container-item:hover {
+      background: rgba(15, 23, 42, 0.8);
+      border-color: rgba(255,255,255,0.08);
     }
     .container-status {
-      width: 8px; height: 8px;
+      width: 10px; height: 10px;
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .status-running { background: #22c55e; box-shadow: 0 0 6px #22c55e80; }
-    .status-exited { background: #ef4444; }
-    .status-paused { background: #f59e0b; }
+    .status-running { background: #22c55e; box-shadow: 0 0 10px #22c55e60; animation: statusPulse 2s infinite; }
+    .status-exited { background: #ef4444; box-shadow: 0 0 6px #ef444440; }
+    .status-paused { background: #f59e0b; box-shadow: 0 0 6px #f59e0b40; }
     .status-other { background: #64748b; }
+    @keyframes statusPulse {
+      0%, 100% { box-shadow: 0 0 10px #22c55e60; }
+      50% { box-shadow: 0 0 18px #22c55e40; }
+    }
     .container-name {
       font-size: 14px;
       font-weight: 500;
@@ -213,6 +342,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
     }
     .container-image {
       font-size: 12px;
@@ -223,15 +353,17 @@
       white-space: nowrap;
     }
     .container-status-text {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-weight: 500;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
-    .text-running { background: #22c55e20; color: #22c55e; }
-    .text-exited { background: #ef444420; color: #ef4444; }
-    .text-paused { background: #f59e0b20; color: #f59e0b; }
-    .text-other { background: #64748b20; color: #64748b; }
+    .text-running { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .text-exited { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .text-paused { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .text-other { background: rgba(100,116,139,0.15); color: #64748b; }
 
     /* Process table */
     .proc-table {
@@ -240,30 +372,34 @@
     }
     .proc-table th {
       text-align: left;
-      font-size: 12px;
+      font-size: 11px;
       color: #64748b;
-      font-weight: 500;
-      padding: 8px 12px;
-      border-bottom: 1px solid #1e293b;
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .proc-table td {
       font-size: 13px;
-      padding: 10px 12px;
-      border-bottom: 1px solid #1e293b10;
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
       color: #cbd5e1;
     }
+    .proc-table tr { transition: background 0.2s; }
+    .proc-table tr:hover { background: rgba(255,255,255,0.02); }
     .proc-table tr:last-child td { border-bottom: none; }
     .proc-bar {
-      height: 4px;
-      background: #1e293b;
-      border-radius: 2px;
+      height: 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
       overflow: hidden;
       min-width: 80px;
     }
     .proc-bar-inner {
       height: 100%;
-      border-radius: 2px;
-      transition: width 0.5s;
+      border-radius: 3px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* Empty state */
@@ -274,57 +410,68 @@
       font-size: 14px;
     }
 
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-
-    /* Responsive */
-    @media (max-width: 900px) {
-      .dashboard { grid-template-columns: 1fr; padding: 16px; }
-      .gauges-row { grid-template-columns: 1fr; }
-    }
-
     /* Loading spinner */
     .spinner {
       display: inline-block;
       width: 16px;
       height: 16px;
-      border: 2px solid #334155;
+      border: 2px solid rgba(255,255,255,0.1);
       border-top-color: #3b82f6;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: #475569; font-size: 13px; }
-
-    /* Error banner */
-    .error-banner {
-      display: none;
-      background: #7f1d1d;
-      color: #fecaca;
-      padding: 10px 32px;
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 28px;
+      color: #475569;
       font-size: 13px;
-      text-align: center;
     }
-    .error-banner button {
-      margin-left: 16px;
-      background: none;
-      border: 1px solid #fecaca;
-      color: #fecaca;
-      padding: 2px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .dashboard { grid-template-columns: repeat(2, 1fr); padding: 16px; }
+      .gauges-row { grid-template-columns: repeat(2, 1fr); }
     }
+    @media (max-width: 700px) {
+      .dashboard { grid-template-columns: 1fr; }
+      .gauges-row { grid-template-columns: 1fr; }
+      .header { padding: 12px 16px; }
+      .header h1 { font-size: 16px; }
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card, .gauge-card {
+      animation: fadeInUp 0.5s ease forwards;
+    }
+    .gauges-row .gauge-card:nth-child(1) { animation-delay: 0.05s; }
+    .gauges-row .gauge-card:nth-child(2) { animation-delay: 0.1s; }
+    .gauges-row .gauge-card:nth-child(3) { animation-delay: 0.15s; }
+    .dashboard > .card:nth-child(2) { animation-delay: 0.2s; }
+    .dashboard > .card:nth-child(3) { animation-delay: 0.25s; }
+    .dashboard > .card:nth-child(4) { animation-delay: 0.3s; }
+    .dashboard > .card:nth-child(5) { animation-delay: 0.35s; }
   </style>
 </head>
 <body>
 
 <div class="header">
   <h1><span class="dot"></span> AI Ops Platform</h1>
-  <div style="display:flex;align-items:center;gap:16px">
-    <span style="font-size:11px;color:#475569" id="last-update">未更新</span>
+  <div class="header-right">
+    <span class="last-update" id="last-update">未更新</span>
     <div class="time" id="clock">--</div>
   </div>
 </div>
@@ -339,22 +486,22 @@
   <div class="gauges-row">
     <div class="gauge-card">
       <div class="gauge-wrap">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
-          <circle class="gauge-fg color-normal" id="cpu-gauge" cx="70" cy="70" r="58"
-            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle class="gauge-bg" cx="75" cy="75" r="62"/>
+          <circle class="gauge-fg color-normal" id="cpu-gauge" cx="75" cy="75" r="62"
+            stroke-dasharray="389.56" stroke-dashoffset="389.56"/>
         </svg>
         <div class="gauge-value color-normal" id="cpu-val">--</div>
       </div>
       <div class="gauge-label">CPU</div>
-      <div class="gauge-sub" id="cpu-sub">--</div>
+      <div class="gauge-sub" id="cpu-sub">-- cores</div>
     </div>
     <div class="gauge-card">
       <div class="gauge-wrap">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
-          <circle class="gauge-fg color-normal" id="mem-gauge" cx="70" cy="70" r="58"
-            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle class="gauge-bg" cx="75" cy="75" r="62"/>
+          <circle class="gauge-fg color-normal" id="mem-gauge" cx="75" cy="75" r="62"
+            stroke-dasharray="389.56" stroke-dashoffset="389.56"/>
         </svg>
         <div class="gauge-value color-normal" id="mem-val">--</div>
       </div>
@@ -363,10 +510,10 @@
     </div>
     <div class="gauge-card">
       <div class="gauge-wrap">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle class="gauge-bg" cx="70" cy="70" r="58"/>
-          <circle class="gauge-fg color-normal" id="disk-gauge" cx="70" cy="70" r="58"
-            stroke-dasharray="364.42" stroke-dashoffset="364.42"/>
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle class="gauge-bg" cx="75" cy="75" r="62"/>
+          <circle class="gauge-fg color-normal" id="disk-gauge" cx="75" cy="75" r="62"
+            stroke-dasharray="389.56" stroke-dashoffset="389.56"/>
         </svg>
         <div class="gauge-value color-normal" id="disk-val">--</div>
       </div>
@@ -377,7 +524,10 @@
 
   <!-- Trend Chart -->
   <div class="card chart-card">
-    <div class="card-title">趋势 (最近60条记录)</div>
+    <div class="card-title">
+      <span class="icon" style="background:#3b82f620;color:#3b82f6">~</span>
+      趋势监控
+    </div>
     <div class="chart-container">
       <canvas id="trendChart"></canvas>
     </div>
@@ -385,7 +535,10 @@
 
   <!-- Network -->
   <div class="card">
-    <div class="card-title">网络流量</div>
+    <div class="card-title">
+      <span class="icon" style="background:#22c55e20;color:#22c55e">N</span>
+      网络流量
+    </div>
     <div class="net-stats">
       <div class="net-item">
         <div class="net-label">上传速度</div>
@@ -398,12 +551,12 @@
         <div class="net-unit">KB/s</div>
       </div>
     </div>
-    <div style="display:flex; gap:24px; margin-top:16px;">
-      <div class="net-item" style="flex:1">
+    <div class="net-totals">
+      <div class="net-item">
         <div class="net-label">累计上传</div>
         <div class="net-value net-up" id="net-total-up" style="font-size:16px">--</div>
       </div>
-      <div class="net-item" style="flex:1">
+      <div class="net-item">
         <div class="net-label">累计下载</div>
         <div class="net-value net-down" id="net-total-down" style="font-size:16px">--</div>
       </div>
@@ -412,7 +565,10 @@
 
   <!-- Docker -->
   <div class="card">
-    <div class="card-title">Docker 容器</div>
+    <div class="card-title">
+      <span class="icon" style="background:#8b5cf620;color:#8b5cf6">D</span>
+      Docker 容器
+    </div>
     <div class="container-list" id="docker-list">
       <div class="loading"><span class="spinner"></span> 加载中...</div>
     </div>
@@ -420,7 +576,10 @@
 
   <!-- Processes -->
   <div class="card">
-    <div class="card-title">Top 5 进程 (CPU)</div>
+    <div class="card-title">
+      <span class="icon" style="background:#f59e0b20;color:#f59e0b">P</span>
+      Top 5 进程 (CPU)
+    </div>
     <table class="proc-table">
       <thead>
         <tr>
@@ -439,7 +598,7 @@
 
 <script>
 const API = window.APP_API_URL || (window.location.origin + '/api');
-const C = 2 * Math.PI * 58; // ~364.42
+const C = 2 * Math.PI * 62; // ~389.56
 
 // --- XSS protection ---
 function esc(str) {
@@ -459,26 +618,42 @@ function showError(msg) {
 
 // --- Chart setup ---
 const ctx = document.getElementById('trendChart').getContext('2d');
+const gradient1 = ctx.createLinearGradient(0, 0, 0, 240);
+gradient1.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+gradient1.addColorStop(1, 'rgba(59, 130, 246, 0)');
+const gradient2 = ctx.createLinearGradient(0, 0, 0, 240);
+gradient2.addColorStop(0, 'rgba(139, 92, 246, 0.3)');
+gradient2.addColorStop(1, 'rgba(139, 92, 246, 0)');
+
 const trendChart = new Chart(ctx, {
   type: 'line',
   data: {
     labels: [],
     datasets: [
-      { label: 'CPU', data: [], borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-      { label: '内存', data: [], borderColor: '#8b5cf6', backgroundColor: '#8b5cf620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+      { label: 'CPU', data: [], borderColor: '#3b82f6', backgroundColor: gradient1, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+      { label: '内存', data: [], borderColor: '#8b5cf6', backgroundColor: gradient2, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
     ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 300 },
+    animation: { duration: 400 },
     scales: {
-      x: { display: true, grid: { color: '#1e293b' }, ticks: { color: '#475569', maxTicksLimit: 10, font: { size: 10 } } },
-      y: { min: 0, max: 100, grid: { color: '#1e293b' }, ticks: { color: '#475569', callback: v => v + '%' } }
+      x: { display: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', maxTicksLimit: 10, font: { size: 10, family: 'JetBrains Mono' } } },
+      y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', callback: v => v + '%', font: { size: 10, family: 'JetBrains Mono' } } }
     },
     plugins: {
-      legend: { labels: { color: '#94a3b8', usePointStyle: true, pointStyle: 'circle', padding: 16 } },
-      tooltip: { mode: 'index', intersect: false }
+      legend: { labels: { color: '#94a3b8', usePointStyle: true, pointStyle: 'circle', padding: 20, font: { size: 12 } } },
+      tooltip: {
+        mode: 'index', intersect: false,
+        backgroundColor: 'rgba(17, 24, 39, 0.9)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 12 },
+        padding: 12,
+        cornerRadius: 8,
+      }
     },
     interaction: { mode: 'nearest', axis: 'x', intersect: false }
   }
@@ -601,18 +776,18 @@ async function fetchProcesses() {
       const cpuColor = cpu > 50 ? '#ef4444' : cpu > 20 ? '#f59e0b' : '#3b82f6';
       const memColor = mem > 50 ? '#ef4444' : mem > 20 ? '#f59e0b' : '#8b5cf6';
       return `<tr>
-        <td style="font-family:monospace;color:#64748b">${p.pid}</td>
+        <td style="font-family:'JetBrains Mono',monospace;color:#64748b">${p.pid}</td>
         <td>${esc(p.name)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="proc-bar"><div class="proc-bar-inner" style="width:${Math.min(cpu, 100)}%;background:${cpuColor}"></div></div>
-            <span style="font-family:monospace;min-width:40px">${cpu}%</span>
+            <span style="font-family:'JetBrains Mono',monospace;min-width:45px;font-size:12px">${cpu}%</span>
           </div>
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="proc-bar"><div class="proc-bar-inner" style="width:${Math.min(mem, 100)}%;background:${memColor}"></div></div>
-            <span style="font-family:monospace;min-width:40px">${mem}%</span>
+            <span style="font-family:'JetBrains Mono',monospace;min-width:45px;font-size:12px">${mem}%</span>
           </div>
         </td>
       </tr>`;
