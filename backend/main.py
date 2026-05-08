@@ -4,8 +4,9 @@ import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import psutil
 import docker
 
@@ -132,6 +133,36 @@ def get_docker_containers():
     except Exception:
         logger.exception("docker endpoint error")
         return {"containers": [], "error": "Internal error"}
+
+
+@app.post("/docker/{container_id}/{action}")
+def docker_action(container_id: str, action: str):
+    if action not in ("start", "stop", "restart"):
+        raise HTTPException(status_code=400, detail="Invalid action")
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        getattr(container, action)()
+        return {"status": "ok", "action": action, "container": container.name}
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="Container not found")
+    except Exception as e:
+        logger.exception("docker action error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/docker/{container_id}/logs")
+def docker_logs(container_id: str, tail: int = 100):
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_id)
+        logs = container.logs(tail=tail, timestamps=True).decode("utf-8", errors="replace")
+        return {"logs": logs}
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="Container not found")
+    except Exception as e:
+        logger.exception("docker logs error")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/processes")

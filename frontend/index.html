@@ -365,6 +365,103 @@
     .text-paused { background: rgba(245,158,11,0.15); color: #f59e0b; }
     .text-other { background: rgba(100,116,139,0.15); color: #64748b; }
 
+    /* Container actions */
+    .container-actions {
+      display: flex;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    .btn-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover {
+      background: rgba(255,255,255,0.1);
+      color: #e2e8f0;
+      border-color: rgba(255,255,255,0.15);
+    }
+    .btn-icon.btn-start:hover { background: rgba(34,197,94,0.2); color: #22c55e; border-color: #22c55e40; }
+    .btn-icon.btn-stop:hover { background: rgba(239,68,68,0.2); color: #ef4444; border-color: #ef444440; }
+    .btn-icon.btn-restart:hover { background: rgba(245,158,11,0.2); color: #f59e0b; border-color: #f59e0b40; }
+    .btn-icon.btn-logs:hover { background: rgba(59,130,246,0.2); color: #3b82f6; border-color: #3b82f640; }
+    .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Log modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .modal-close {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255,255,255,0.06);
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+    .modal-body {
+      padding: 16px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .log-content {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
     /* Process table */
     .proc-table {
       width: 100%;
@@ -596,6 +693,19 @@
   </div>
 </div>
 
+<!-- Log Modal -->
+<div class="modal-overlay" id="log-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="log-title">容器日志</h3>
+      <button class="modal-close" onclick="closeLogModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre class="log-content" id="log-content">加载中...</pre>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = window.APP_API_URL || (window.location.origin + '/api');
 const C = 2 * Math.PI * 62; // ~389.56
@@ -747,11 +857,18 @@ async function fetchDocker() {
       if (s === 'running') cls = 'running';
       else if (s === 'exited') cls = 'exited';
       else if (s === 'paused') cls = 'paused';
+      const startBtn = s !== 'running' ? `<button class="btn-icon btn-start" title="启动" onclick="dockerAction('${c.id}','start')">▶</button>` : '';
+      const stopBtn = s === 'running' ? `<button class="btn-icon btn-stop" title="停止" onclick="dockerAction('${c.id}','stop')">■</button>` : '';
+      const restartBtn = s === 'running' ? `<button class="btn-icon btn-restart" title="重启" onclick="dockerAction('${c.id}','restart')">↻</button>` : '';
       return `<div class="container-item">
         <div class="container-status status-${cls}"></div>
         <div class="container-name">${esc(c.name)}</div>
         <div class="container-image">${esc(c.image)}</div>
         <div class="container-status-text text-${cls}">${esc(s)}</div>
+        <div class="container-actions">
+          ${startBtn}${stopBtn}${restartBtn}
+          <button class="btn-icon btn-logs" title="日志" onclick="viewLogs('${c.id}','${esc(c.name)}')">📋</button>
+        </div>
       </div>`;
     }).join('');
   } catch (e) {
@@ -759,6 +876,40 @@ async function fetchDocker() {
     showError('Docker 数据加载失败');
   }
 }
+
+// --- Docker Actions ---
+async function dockerAction(id, action) {
+  try {
+    const r = await fetch(API + '/docker/' + id + '/' + action, { method: 'POST' });
+    if (!r.ok) throw new Error('Action failed');
+    setTimeout(fetchDocker, 1000);
+  } catch (e) {
+    console.error('docker action', e);
+    showError('容器操作失败: ' + action);
+  }
+}
+
+// --- View Logs ---
+async function viewLogs(id, name) {
+  document.getElementById('log-title').textContent = name + ' - 日志';
+  document.getElementById('log-content').textContent = '加载中...';
+  document.getElementById('log-modal').classList.add('active');
+  try {
+    const r = await fetch(API + '/docker/' + id + '/logs?tail=200');
+    const d = await r.json();
+    document.getElementById('log-content').textContent = d.logs || '暂无日志';
+  } catch (e) {
+    document.getElementById('log-content').textContent = '获取日志失败';
+  }
+}
+
+function closeLogModal() {
+  document.getElementById('log-modal').classList.remove('active');
+}
+
+document.getElementById('log-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeLogModal();
+});
 
 // --- Fetch Processes ---
 async function fetchProcesses() {
