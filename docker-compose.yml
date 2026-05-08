@@ -1,11 +1,17 @@
 services:
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
     volumes:
       - ./logs:/app/logs
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CORS_ORIGINS=http://localhost:3000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
@@ -14,4 +20,9 @@ services:
       - "3000:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
