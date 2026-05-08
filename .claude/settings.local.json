@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(docker-compose up *)",
+      "Bash(git *)",
+      "Bash(docker-compose ps *)",
+      "Bash(docker-compose logs *)",
+      "Bash(curl -s http://localhost:3000/api/)",
+      "Bash(curl -s http://localhost:3000/api/system)",
+      "Bash(curl -s http://localhost:3000/api/network)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl *)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }
