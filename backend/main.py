@@ -1,4 +1,6 @@
+import os
 import time
+import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -7,12 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import psutil
 import docker
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=cors_origins,
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
@@ -22,6 +28,8 @@ DB_PATH = "/data/ops.db" if psutil.os.path.exists("/data") else "ops.db"
 
 def init_db():
     with get_db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,10 +55,11 @@ init_db()
 
 # --- Background recorder (every 60s) ---
 
-prev_net = psutil.net_io_counters()
+_net_lock = threading.Lock()
+_prev_net = psutil.net_io_counters()
 
 def record_metrics():
-    global prev_net
+    global _prev_net
     while True:
         time.sleep(60)
         try:
@@ -58,9 +67,10 @@ def record_metrics():
             mem = psutil.virtual_memory().percent
             disk = psutil.disk_usage("/").percent
             net = psutil.net_io_counters()
-            sent_speed = (net.bytes_sent - prev_net.bytes_sent) / 60
-            recv_speed = (net.bytes_recv - prev_net.bytes_recv) / 60
-            prev_net = net
+            with _net_lock:
+                sent_speed = (net.bytes_sent - _prev_net.bytes_sent) / 60
+                recv_speed = (net.bytes_recv - _prev_net.bytes_recv) / 60
+                _prev_net = net
             with get_db() as conn:
                 conn.execute(
                     "INSERT INTO metrics (ts, cpu, memory, disk, net_sent, net_recv) VALUES (?, ?, ?, ?, ?, ?)",
@@ -68,7 +78,7 @@ def record_metrics():
                 )
                 conn.commit()
         except Exception:
-            pass
+            logger.exception("record_metrics failed")
 
 threading.Thread(target=record_metrics, daemon=True).start()
 
@@ -90,11 +100,12 @@ def get_system_info():
 
 @app.get("/network")
 def get_network():
-    global prev_net
+    global _prev_net
     net = psutil.net_io_counters()
-    sent_speed = net.bytes_sent - prev_net.bytes_sent
-    recv_speed = net.bytes_recv - prev_net.bytes_recv
-    prev_net = net
+    with _net_lock:
+        sent_speed = net.bytes_sent - _prev_net.bytes_sent
+        recv_speed = net.bytes_recv - _prev_net.bytes_recv
+        _prev_net = net
     return {
         "bytes_sent": net.bytes_sent,
         "bytes_recv": net.bytes_recv,
@@ -116,8 +127,11 @@ def get_docker_containers():
                 "id": c.short_id,
             })
         return {"containers": containers}
-    except Exception as e:
-        return {"containers": [], "error": str(e)}
+    except docker.errors.DockerException:
+        return {"containers": [], "error": "Docker service unavailable"}
+    except Exception:
+        logger.exception("docker endpoint error")
+        return {"containers": [], "error": "Internal error"}
 
 
 @app.get("/processes")
