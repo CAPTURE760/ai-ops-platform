@@ -462,6 +462,92 @@
       word-break: break-all;
     }
 
+    /* Alert bar */
+    .alert-bar {
+      display: none;
+      padding: 10px 32px;
+      font-size: 13px;
+      text-align: center;
+      animation: alertPulse 2s infinite;
+    }
+    .alert-bar.active { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .alert-bar.alert-warn { background: rgba(245,158,11,0.15); color: #fbbf24; border-bottom: 1px solid rgba(245,158,11,0.3); }
+    .alert-bar.alert-danger { background: rgba(239,68,68,0.15); color: #f87171; border-bottom: 1px solid rgba(239,68,68,0.3); }
+    @keyframes alertPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .alert-icon { font-size: 16px; }
+    .alert-text { flex: 1; }
+    .alert-dismiss {
+      background: none;
+      border: 1px solid currentColor;
+      color: inherit;
+      padding: 2px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    .alert-dismiss:hover { opacity: 1; }
+
+    /* Settings panel */
+    .settings-btn {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .settings-btn:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+    .settings-panel {
+      display: none;
+      position: absolute;
+      top: 60px;
+      right: 32px;
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      z-index: 150;
+      min-width: 240px;
+      animation: modalIn 0.2s ease;
+    }
+    .settings-panel.active { display: block; }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .settings-row:last-child { margin-bottom: 0; }
+    .settings-label {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .settings-input {
+      width: 60px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #e2e8f0;
+      padding: 4px 8px;
+      font-size: 13px;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .settings-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
     /* Process table */
     .proc-table {
       width: 100%;
@@ -570,7 +656,30 @@
   <div class="header-right">
     <span class="last-update" id="last-update">未更新</span>
     <div class="time" id="clock">--</div>
+    <button class="settings-btn" onclick="toggleSettings()" title="告警设置">⚙</button>
   </div>
+</div>
+
+<div class="settings-panel" id="settings-panel">
+  <div style="font-size:14px;font-weight:600;color:#e2e8f0;margin-bottom:16px">告警阈值 (%)</div>
+  <div class="settings-row">
+    <span class="settings-label">CPU</span>
+    <input class="settings-input" type="number" id="threshold-cpu" value="80" min="1" max="100">
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">内存</span>
+    <input class="settings-input" type="number" id="threshold-mem" value="80" min="1" max="100">
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">磁盘</span>
+    <input class="settings-input" type="number" id="threshold-disk" value="90" min="1" max="100">
+  </div>
+</div>
+
+<div class="alert-bar" id="alert-bar">
+  <span class="alert-icon">⚠</span>
+  <span class="alert-text" id="alert-text"></span>
+  <button class="alert-dismiss" onclick="dismissAlert()">忽略</button>
 </div>
 
 <div class="error-banner" id="error-banner">
@@ -726,6 +835,67 @@ function showError(msg) {
   }, 8000);
 }
 
+// --- Settings ---
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('active');
+}
+
+// --- Alerts ---
+let alertDismissed = false;
+
+function checkAlerts(cpu, mem, disk) {
+  const cpuT = parseInt(document.getElementById('threshold-cpu').value) || 80;
+  const memT = parseInt(document.getElementById('threshold-mem').value) || 80;
+  const diskT = parseInt(document.getElementById('threshold-disk').value) || 90;
+
+  const alerts = [];
+  if (cpu >= cpuT) alerts.push(`CPU ${Math.round(cpu)}% (阈值 ${cpuT}%)`);
+  if (mem >= memT) alerts.push(`内存 ${Math.round(mem)}% (阈值 ${memT}%)`);
+  if (disk >= diskT) alerts.push(`磁盘 ${Math.round(disk)}% (阈值 ${diskT}%)`);
+
+  const bar = document.getElementById('alert-bar');
+  const text = document.getElementById('alert-text');
+
+  if (alerts.length > 0 && !alertDismissed) {
+    text.textContent = '警告: ' + alerts.join(' | ');
+    const isDanger = cpu >= 90 || mem >= 90 || disk >= 95;
+    bar.className = 'alert-bar active ' + (isDanger ? 'alert-danger' : 'alert-warn');
+    // Play alert sound
+    if (!bar.dataset.alerted) {
+      bar.dataset.alerted = 'true';
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start();
+        setTimeout(() => { osc.stop(); audioCtx.close(); }, 200);
+      } catch (e) {}
+    }
+  } else if (alerts.length === 0) {
+    bar.className = 'alert-bar';
+    bar.dataset.alerted = '';
+    alertDismissed = false;
+  }
+}
+
+function dismissAlert() {
+  alertDismissed = true;
+  document.getElementById('alert-bar').className = 'alert-bar';
+}
+
+// Close settings when clicking outside
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('settings-panel');
+  const btn = document.querySelector('.settings-btn');
+  if (panel.classList.contains('active') && !panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.remove('active');
+  }
+});
+
 // --- Chart setup ---
 const ctx = document.getElementById('trendChart').getContext('2d');
 const gradient1 = ctx.createLinearGradient(0, 0, 0, 240);
@@ -820,6 +990,7 @@ async function fetchSystem() {
     document.getElementById('mem-sub').textContent = '使用率';
     document.getElementById('disk-sub').textContent = '使用率';
     document.getElementById('last-update').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
+    checkAlerts(d.cpu, d.memory, d.disk);
   } catch (e) {
     console.error('system', e);
     showError('系统数据加载失败，正在重试...');
