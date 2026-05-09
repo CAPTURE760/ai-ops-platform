@@ -8,3 +8,9 @@ __pycache__/
 
 # 日志
 logs/
+
+# SSL 证书
+certbot/
+
+# 数据库
+backend/ops.db
