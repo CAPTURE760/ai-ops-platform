@@ -577,6 +577,11 @@
       background: rgba(59, 130, 246, 0.2);
       border-color: rgba(59, 130, 246, 0.5);
     }
+    .ops-preset-btn.active {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: #3b82f6;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
     .ops-preset-btn .desc {
       display: none;
       font-size: 11px;
@@ -1049,10 +1054,6 @@
     <div class="ops-presets" id="ops-presets">
       <span style="color:#64748b;font-size:12px">加载预设命令...</span>
     </div>
-    <div class="ops-input-row">
-      <input type="text" class="ops-input" id="ops-cmd" placeholder="输入命令或选择预设..." onkeyup="if(event.key==='Enter')executeCmd()">
-      <button class="ops-exec-btn" id="ops-exec-btn" onclick="executeCmd()">执行</button>
-    </div>
     <div class="ops-result" id="ops-result" style="display:none;"></div>
     <div class="ops-history" id="ops-history"></div>
   </div>
@@ -1464,54 +1465,40 @@ async function fetchPresets() {
 }
 
 function selectPreset(id) {
-  const preset = opsPresets.find(p => p.id === id);
-  if (!preset) return;
-  document.getElementById('ops-cmd').value = preset.cmd;
-  // Show description tooltip
-  const el = document.getElementById('ops-result');
-  el.style.display = 'block';
-  el.innerHTML = `<span style="color:#60a5fa">说明：${esc(preset.desc)}</span>\n<span style="color:#64748b">命令：${esc(preset.cmd)}</span>\n<span style="color:#64748b">按 Enter 或点击执行按钮运行</span>`;
+  executePreset(id);
 }
 
-async function executeCmd() {
-  const input = document.getElementById('ops-cmd');
-  const cmd = input.value.trim();
-  if (!cmd) return;
+async function executePreset(id) {
+  const preset = opsPresets.find(p => p.id === id);
+  if (!preset) return;
 
-  const btn = document.getElementById('ops-exec-btn');
   const resultEl = document.getElementById('ops-result');
-  btn.disabled = true;
-  btn.textContent = '执行中...';
   resultEl.style.display = 'block';
-  resultEl.innerHTML = `<span style="color:#60a5fa">$ ${esc(cmd)}</span>\n执行中...`;
+  resultEl.innerHTML = `<span style="color:#60a5fa">${esc(preset.name)}</span>\n执行中...`;
+
+  // Highlight active button
+  document.querySelectorAll('.ops-preset-btn').forEach(b => b.classList.remove('active'));
+  const btns = document.querySelectorAll('.ops-preset-btn');
+  btns.forEach(b => { if (b.textContent === preset.name) b.classList.add('active'); });
 
   try {
-    // Check if it's a preset command
-    const preset = opsPresets.find(p => p.cmd === cmd);
-    const body = preset ? { preset_id: preset.id } : { cmd: cmd };
-
     const r = await fetch(API + '/ops/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ preset_id: id }),
     });
     const d = await r.json();
 
     if (!r.ok) {
       resultEl.innerHTML = `<span class="error-line">错误：${esc(d.detail || '执行失败')}</span>`;
     } else {
-      const output = d.stdout || '(无输出)';
-      resultEl.innerHTML = `<span class="cmd-line">$ ${esc(d.cmd)}</span>\n${esc(output)}`;
-      // Add to history
-      opsHistory.unshift({ cmd: d.cmd, time: new Date(), success: d.success });
+      resultEl.innerHTML = `<span class="cmd-line"># ${esc(d.name)}</span>\n${esc(d.output || '(无输出)')}`;
+      opsHistory.unshift({ name: d.name, id: id, time: new Date(), success: d.success });
       if (opsHistory.length > 10) opsHistory.pop();
       renderOpsHistory();
     }
   } catch (e) {
     resultEl.innerHTML = `<span class="error-line">请求失败：${esc(e.message)}</span>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '执行';
   }
 }
 
@@ -1523,8 +1510,8 @@ function renderOpsHistory() {
   }
   el.innerHTML = '<div style="margin-bottom:4px">最近执行：</div>' +
     opsHistory.map(h =>
-      `<div class="ops-history-item" onclick="document.getElementById('ops-cmd').value='${esc(h.cmd)}'">
-        ${h.success ? '&#10003;' : '&#10007;'} ${esc(h.cmd)}
+      `<div class="ops-history-item" onclick="executePreset('${esc(h.id)}')">
+        ${h.success ? '&#10003;' : '&#10007;'} ${esc(h.name)}
         <span style="float:right">${h.time.toLocaleTimeString('zh-CN')}</span>
       </div>`
     ).join('');

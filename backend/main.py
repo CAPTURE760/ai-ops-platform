@@ -5,6 +5,7 @@ import sqlite3
 import threading
 import subprocess
 from contextlib import contextmanager
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -348,24 +349,168 @@ def get_log_stats():
 # --- Automation Ops Endpoints ---
 
 PRESET_COMMANDS = [
-    {"id": "disk_check", "name": "磁盘检查", "cmd": "df -h", "desc": "查看磁盘使用情况，显示各分区容量和已用空间"},
-    {"id": "mem_check", "name": "内存检查", "cmd": "free -h", "desc": "查看内存使用情况，包括物理内存和交换分区"},
-    {"id": "process_top", "name": "进程监控", "cmd": "ps aux --sort=-%cpu | head -15", "desc": "查看 CPU 占用最高的前 15 个进程"},
-    {"id": "docker_ps", "name": "容器列表", "cmd": "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'", "desc": "列出所有 Docker 容器及其状态"},
-    {"id": "docker_stats", "name": "容器资源", "cmd": "docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}'", "desc": "查看运行中容器的 CPU 和内存使用"},
-    {"id": "network_check", "name": "网络检查", "cmd": "ss -tuln", "desc": "查看所有监听的 TCP/UDP 端口"},
-    {"id": "uptime_check", "name": "运行时间", "cmd": "uptime", "desc": "查看系统运行时间和平均负载"},
-    {"id": "disk_io", "name": "磁盘 IO", "cmd": "iostat -x 1 2 | tail -20", "desc": "查看磁盘读写性能指标"},
-    {"id": "net_connections", "name": "网络连接", "cmd": "ss -s", "desc": "查看网络连接统计摘要"},
-    {"id": "kernel_logs", "name": "内核日志", "cmd": "dmesg --level=err,warn | tail -20", "desc": "查看最近的内核错误和警告"},
+    {"id": "disk_check", "name": "磁盘检查", "desc": "查看磁盘使用情况，显示各分区容量和已用空间"},
+    {"id": "mem_check", "name": "内存检查", "desc": "查看内存使用情况，包括物理内存和交换分区"},
+    {"id": "process_top", "name": "进程监控", "desc": "查看 CPU 占用最高的前 15 个进程"},
+    {"id": "docker_ps", "name": "容器列表", "desc": "列出所有 Docker 容器及其状态"},
+    {"id": "docker_stats", "name": "容器资源", "desc": "查看运行中容器的 CPU 和内存使用"},
+    {"id": "network_check", "name": "网络检查", "desc": "查看所有监听的 TCP/UDP 端口"},
+    {"id": "uptime_check", "name": "运行时间", "desc": "查看系统运行时间和平均负载"},
+    {"id": "disk_io", "name": "磁盘 IO", "desc": "查看磁盘读写性能指标"},
+    {"id": "net_connections", "name": "网络连接", "desc": "查看网络连接统计摘要"},
+    {"id": "kernel_logs", "name": "内核日志", "desc": "查看最近的内核错误和警告"},
 ]
 
-BLOCKED_PATTERNS = [
-    "rm -rf /", "rm -rf /*", "dd if=", "mkfs", "fdisk",
-    "> /dev/sd", "chmod 777 /", "chown root",
-    ":(){ :|:& };:", "shutdown", "reboot", "halt", "poweroff",
-    "mkfs.ext4", "mkfs.xfs", "wipefs",
-]
+
+def _fmt_bytes(b):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if b < 1024:
+            return f"{b:.1f} {unit}"
+        b /= 1024
+
+
+def _run_preset(preset_id: str) -> dict:
+    if preset_id == "disk_check":
+        lines = ["文件系统                容量  已用  可用  使用%  挂载点"]
+        for part in psutil.disk_partitions():
+            try:
+                u = psutil.disk_usage(part.mountpoint)
+                lines.append(f"{part.device:20s}  {_fmt_bytes(u.total):>8s}  {_fmt_bytes(u.used):>8s}  {_fmt_bytes(u.free):>8s}  {u.percent:5.1f}%  {part.mountpoint}")
+            except PermissionError:
+                continue
+        return {"output": "\n".join(lines)}
+
+    elif preset_id == "mem_check":
+        vm = psutil.virtual_memory()
+        sw = psutil.swap_memory()
+        lines = [
+            "              总量      已用      可用    使用%",
+            f"物理内存  {_fmt_bytes(vm.total):>8s}  {_fmt_bytes(vm.used):>8s}  {_fmt_bytes(vm.available):>8s}  {vm.percent:5.1f}%",
+            f"交换分区  {_fmt_bytes(sw.total):>8s}  {_fmt_bytes(sw.used):>8s}  {_fmt_bytes(sw.free):>8s}  {sw.percent:5.1f}%",
+        ]
+        return {"output": "\n".join(lines)}
+
+    elif preset_id == "process_top":
+        procs = []
+        for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "username"]):
+            try:
+                procs.append(p.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        procs.sort(key=lambda x: x.get("cpu_percent", 0) or 0, reverse=True)
+        lines = [f"{'PID':>7s}  {'USER':12s}  {'CPU%':>6s}  {'MEM%':>6s}  {'NAME':20s}"]
+        for p in procs[:15]:
+            lines.append(f"{p['pid']:>7d}  {(p.get('username') or '-')[:12]:12s}  {(p.get('cpu_percent') or 0):5.1f}%  {(p.get('memory_percent') or 0):5.1f}%  {(p.get('name') or '-')[:20]:20s}")
+        return {"output": "\n".join(lines)}
+
+    elif preset_id == "docker_ps":
+        try:
+            client = docker.from_env()
+            lines = [f"{'名称':20s}  {'状态':12s}  {'镜像':30s}  {'ID':12s}"]
+            for c in client.containers.list(all=True):
+                image = c.image.tags[0] if c.image.tags else str(c.image.id)[:12]
+                lines.append(f"{c.name:20s}  {c.status:12s}  {image[:30]:30s}  {c.short_id:12s}")
+            return {"output": "\n".join(lines)}
+        except Exception as e:
+            return {"output": f"Docker 不可用: {e}", "error": True}
+
+    elif preset_id == "docker_stats":
+        try:
+            client = docker.from_env()
+            lines = [f"{'名称':20s}  {'CPU%':>8s}  {'内存使用':15s}  {'状态':12s}"]
+            for c in client.containers.list():
+                try:
+                    stats = c.stats(stream=False)
+                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                    system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
+                    cpu_pct = (cpu_delta / system_delta * len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"]) * 100) if system_delta > 0 else 0
+                    mem_usage = stats["memory_stats"].get("usage", 0)
+                    mem_limit = stats["memory_stats"].get("limit", 0)
+                    lines.append(f"{c.name:20s}  {cpu_pct:>7.2f}%  {_fmt_bytes(mem_usage):>8s}/{_fmt_bytes(mem_limit):>8s}  {c.status:12s}")
+                except Exception:
+                    lines.append(f"{c.name:20s}  {'N/A':>8s}  {'N/A':>15s}  {c.status:12s}")
+            return {"output": "\n".join(lines)}
+        except Exception as e:
+            return {"output": f"Docker 不可用: {e}", "error": True}
+
+    elif preset_id == "network_check":
+        lines = [f"{'协议':6s}  {'本地地址':30s}  {'状态':12s}  {'进程':15s}"]
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.status == "LISTEN":
+                laddr = f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else "-"
+                proc_name = "-"
+                if conn.pid:
+                    try:
+                        proc_name = psutil.Process(conn.pid).name()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        proc_name = f"pid:{conn.pid}"
+                proto = "tcp" if conn.type == 1 else "udp"
+                lines.append(f"{proto:6s}  {laddr:30s}  {conn.status:12s}  {proc_name:15s}")
+        return {"output": "\n".join(lines) if len(lines) > 1 else "没有监听中的端口"}
+
+    elif preset_id == "uptime_check":
+        boot = datetime.fromtimestamp(psutil.boot_time())
+        uptime_sec = time.time() - psutil.boot_time()
+        days, rem = divmod(int(uptime_sec), 86400)
+        hours, rem = divmod(rem, 3600)
+        mins, _ = divmod(rem, 60)
+        try:
+            load = os.getloadavg()
+            load_str = f"负载: {load[0]:.2f}, {load[1]:.2f}, {load[2]:.2f}"
+        except (OSError, AttributeError):
+            load_str = "负载: N/A"
+        return {"output": f"启动时间: {boot.strftime('%Y-%m-%d %H:%M:%S')}\n运行时长: {days}天 {hours}小时 {mins}分钟\n{load_str}"}
+
+    elif preset_id == "disk_io":
+        io = psutil.disk_io_counters(perdisk=True)
+        lines = [f"{'设备':10s}  {'读次数':>10s}  {'写次数':>10s}  {'读取':>10s}  {'写入':>10s}"]
+        for dev, counters in io.items():
+            if dev.startswith("loop"):
+                continue
+            lines.append(f"{dev:10s}  {counters.read_count:>10d}  {counters.write_count:>10d}  {_fmt_bytes(counters.read_bytes):>10s}  {_fmt_bytes(counters.write_bytes):>10s}")
+        return {"output": "\n".join(lines)}
+
+    elif preset_id == "net_connections":
+        conns = psutil.net_connections(kind="inet")
+        status_count = {}
+        for c in conns:
+            status_count[c.status] = status_count.get(c.status, 0) + 1
+        lines = [f"{'状态':15s}  {'数量':>6s}"]
+        for status, count in sorted(status_count.items(), key=lambda x: -x[1]):
+            lines.append(f"{status:15s}  {count:>6d}")
+        lines.append(f"\n总计: {len(conns)} 个连接")
+        return {"output": "\n".join(lines)}
+
+    elif preset_id == "kernel_logs":
+        try:
+            result = subprocess.run(
+                ["dmesg", "--level=err,warn"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                # Try reading from journalctl
+                result = subprocess.run(
+                    ["journalctl", "-p", "warning", "-n", "20", "--no-pager"],
+                    capture_output=True, text=True, timeout=5
+                )
+            if result.returncode == 0 and result.stdout.strip():
+                lines = result.stdout.strip().split("\n")[-20:]
+                return {"output": "\n".join(lines)}
+            # Fallback: read /var/log/kern.log or /var/log/messages
+            for logfile in ["/var/log/kern.log", "/var/log/messages", "/var/log/syslog"]:
+                if os.path.exists(logfile):
+                    try:
+                        with open(logfile, "r") as f:
+                            lines = f.readlines()[-20:]
+                        return {"output": "".join(lines).strip() or "无内核日志"}
+                    except PermissionError:
+                        continue
+            return {"output": "无法读取内核日志（权限不足或日志文件不存在）"}
+        except Exception as e:
+            return {"output": f"读取内核日志失败: {e}", "error": True}
+
+    return {"output": "未知的预设命令", "error": True}
+
 
 @app.get("/ops/presets")
 def get_preset_commands():
@@ -374,37 +519,23 @@ def get_preset_commands():
 
 @app.post("/ops/execute")
 def execute_command(body: dict):
-    cmd = body.get("cmd", "").strip()
     preset_id = body.get("preset_id", "").strip()
 
-    # If preset_id provided, look up the command
     if preset_id:
         preset = next((p for p in PRESET_COMMANDS if p["id"] == preset_id), None)
         if not preset:
-            raise HTTPException(status_code=404, detail="Preset command not found")
-        cmd = preset["cmd"]
+            raise HTTPException(status_code=404, detail="预设命令不存在")
+        try:
+            result = _run_preset(preset_id)
+            return {
+                "preset_id": preset_id,
+                "name": preset["name"],
+                "output": result.get("output", ""),
+                "success": not result.get("error", False),
+            }
+        except Exception as e:
+            logger.exception(f"preset {preset_id} failed")
+            raise HTTPException(status_code=500, detail=f"执行失败: {str(e)}")
 
-    if not cmd:
-        raise HTTPException(status_code=400, detail="No command provided")
-
-    # Security check: block dangerous commands
-    cmd_lower = cmd.lower()
-    for pattern in BLOCKED_PATTERNS:
-        if pattern in cmd_lower:
-            raise HTTPException(status_code=403, detail=f"命令被拒绝：包含危险操作 '{pattern}'")
-
-    # Execute with timeout
-    try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=30
-        )
-        return {
-            "cmd": cmd,
-            "stdout": result.stdout,
-            "returncode": result.returncode,
-            "success": result.returncode == 0,
-        }
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=408, detail="命令执行超时（30秒）")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"执行失败: {str(e)}")
+    # Custom commands are no longer supported for security reasons
+    raise HTTPException(status_code=400, detail="请使用预设命令，自定义命令已禁用")
