@@ -7,9 +7,9 @@ services:
       - ./backend:/app
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
-      - ROOT_USER=${ROOT_USER:-lqr552200}
-      - ROOT_PASSWORD=${ROOT_PASSWORD:-lqr520...}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ROOT_USER=${ROOT_USER}
+      - ROOT_PASSWORD=${ROOT_PASSWORD}
       - TOKEN_EXPIRE_HOURS=${TOKEN_EXPIRE_HOURS:-24}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
