@@ -840,6 +840,38 @@
 </head>
 <body>
 
+<!-- Login Page -->
+<div id="login-page" style="display:none;">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:rgba(17,24,39,0.8);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:48px 40px;width:100%;max-width:400px;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:28px;font-weight:700;background:linear-gradient(135deg,#38bdf8,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI Ops Platform</div>
+        <div style="color:#64748b;font-size:13px;margin-top:8px;">运维监控平台</div>
+      </div>
+      <div id="login-error" style="display:none;background:rgba(239,68,68,0.15);color:#f87171;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;text-align:center;"></div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;color:#64748b;display:block;margin-bottom:6px;">用户名</label>
+        <input type="text" id="login-username" autocomplete="username"
+          style="width:100%;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color 0.2s;"
+          onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+      </div>
+      <div style="margin-bottom:24px;">
+        <label style="font-size:12px;color:#64748b;display:block;margin-bottom:6px;">密码</label>
+        <input type="password" id="login-password" autocomplete="current-password"
+          style="width:100%;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color 0.2s;"
+          onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+      </div>
+      <button id="login-btn" onclick="doLogin()"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:none;border-radius:10px;color:white;font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.2s;">
+        登录
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app" style="display:none;">
+
 <div class="header">
   <h1><span class="dot"></span> AI Ops Platform</h1>
   <div class="header-right">
@@ -1046,7 +1078,7 @@
   </div>
 
   <!-- Automation Ops -->
-  <div class="card" style="grid-column: 1 / -1;">
+  <div class="card" id="ops-card" style="grid-column: 1 / -1;">
     <div class="card-title">
       <span class="icon" style="background:#8b5cf620;color:#8b5cf6">A</span>
       自动化运维
@@ -1072,9 +1104,97 @@
   </div>
 </div>
 
+</div><!-- /app -->
+
 <script>
 const API = window.APP_API_URL || (window.location.origin + '/api');
 const C = 2 * Math.PI * 62; // ~389.56
+
+// --- Auth ---
+const TOKEN_KEY = 'aiops_token';
+const USER_KEY = 'aiops_user';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function getUser() { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } }
+function setAuth(token, user) { localStorage.setItem(TOKEN_KEY, token); localStorage.setItem(USER_KEY, JSON.stringify(user)); }
+function clearAuth() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); }
+
+async function authFetch(url, options = {}) {
+  const token = getToken();
+  if (!options.headers) options.headers = {};
+  if (token) options.headers['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(url, options);
+  if (r.status === 401) {
+    clearAuth();
+    stopPolling();
+    showLoginPage();
+    throw new Error('认证已过期');
+  }
+  return r;
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  if (!username || !password) { errEl.textContent = '请输入用户名和密码'; errEl.style.display = 'block'; return; }
+  btn.textContent = '登录中...'; btn.disabled = true; errEl.style.display = 'none';
+  try {
+    const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.detail || '登录失败'; errEl.style.display = 'block'; return; }
+    setAuth(d.access_token, { username: d.username, role: d.role });
+    showDashboard();
+  } catch (e) { errEl.textContent = '网络错误，请重试'; errEl.style.display = 'block'; }
+  finally { btn.textContent = '登录'; btn.disabled = false; }
+}
+
+function showLoginPage() {
+  document.getElementById('login-page').style.display = 'block';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showDashboard() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  applyRole();
+  startPolling();
+}
+
+function logout() { clearAuth(); stopPolling(); showLoginPage(); }
+
+function applyRole() {
+  const user = getUser();
+  const isRoot = user && user.role === 'root';
+  // Show user info in header
+  const headerRight = document.querySelector('.header-right');
+  const oldInfo = document.getElementById('user-info');
+  if (oldInfo) oldInfo.remove();
+  const div = document.createElement('div');
+  div.id = 'user-info';
+  div.style.cssText = 'display:flex;align-items:center;gap:12px;font-size:13px;color:#94a3b8;';
+  div.innerHTML = '<span>' + esc(user ? user.username : '') + ' <span style="font-size:11px;padding:2px 6px;background:rgba(' + (isRoot ? '239,68,68' : '59,130,246') + ',0.15);color:' + (isRoot ? '#ef4444' : '#3b82f6') + ';border-radius:4px;">' + (isRoot ? 'root' : 'viewer') + '</span></span>' +
+    '<button onclick="logout()" style="padding:4px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#94a3b8;cursor:pointer;font-size:12px;">登出</button>';
+  headerRight.prepend(div);
+  // Hide ops card for non-root
+  const opsCard = document.getElementById('ops-card');
+  if (opsCard) opsCard.style.display = isRoot ? '' : 'none';
+}
+
+let pollTimers = [];
+function startPolling() {
+  stopPolling();
+  fetchSystem(); fetchNetwork(); fetchDocker(); fetchProcesses(); fetchHistory(); fetchLogs(); fetchLogStats(); fetchPresets();
+  pollTimers.push(setInterval(fetchSystem, 3000));
+  pollTimers.push(setInterval(fetchNetwork, 3000));
+  pollTimers.push(setInterval(fetchDocker, 10000));
+  pollTimers.push(setInterval(fetchProcesses, 5000));
+  pollTimers.push(setInterval(fetchHistory, 30000));
+  pollTimers.push(setInterval(fetchLogs, 30000));
+  pollTimers.push(setInterval(fetchLogStats, 30000));
+}
+function stopPolling() { pollTimers.forEach(t => clearInterval(t)); pollTimers = []; }
 
 // --- XSS protection ---
 function esc(str) {
@@ -1238,7 +1358,7 @@ updateClock();
 // --- Fetch System ---
 async function fetchSystem() {
   try {
-    const r = await fetch(API + '/system');
+    const r = await authFetch(API + '/system');
     const d = await r.json();
     setGauge('cpu', d.cpu);
     setGauge('mem', d.memory);
@@ -1257,7 +1377,7 @@ async function fetchSystem() {
 // --- Fetch Network ---
 async function fetchNetwork() {
   try {
-    const r = await fetch(API + '/network');
+    const r = await authFetch(API + '/network');
     const d = await r.json();
     document.getElementById('net-up').textContent = formatSpeed(d.sent_speed);
     document.getElementById('net-down').textContent = formatSpeed(d.recv_speed);
@@ -1272,22 +1392,24 @@ async function fetchNetwork() {
 // --- Fetch Docker ---
 async function fetchDocker() {
   try {
-    const r = await fetch(API + '/docker');
+    const r = await authFetch(API + '/docker');
     const d = await r.json();
     const el = document.getElementById('docker-list');
     if (!d.containers || d.containers.length === 0) {
       el.innerHTML = '<div class="empty">没有容器</div>';
       return;
     }
+    const user = getUser();
+    const isRoot = user && user.role === 'root';
     el.innerHTML = d.containers.map(c => {
       const s = c.status;
       let cls = 'other';
       if (s === 'running') cls = 'running';
       else if (s === 'exited') cls = 'exited';
       else if (s === 'paused') cls = 'paused';
-      const startBtn = s !== 'running' ? `<button class="btn-icon btn-start" title="启动" onclick="dockerAction('${c.id}','start')">▶</button>` : '';
-      const stopBtn = s === 'running' ? `<button class="btn-icon btn-stop" title="停止" onclick="dockerAction('${c.id}','stop')">■</button>` : '';
-      const restartBtn = s === 'running' ? `<button class="btn-icon btn-restart" title="重启" onclick="dockerAction('${c.id}','restart')">↻</button>` : '';
+      const startBtn = isRoot && s !== 'running' ? `<button class="btn-icon btn-start" title="启动" onclick="dockerAction('${c.id}','start')">▶</button>` : '';
+      const stopBtn = isRoot && s === 'running' ? `<button class="btn-icon btn-stop" title="停止" onclick="dockerAction('${c.id}','stop')">■</button>` : '';
+      const restartBtn = isRoot && s === 'running' ? `<button class="btn-icon btn-restart" title="重启" onclick="dockerAction('${c.id}','restart')">↻</button>` : '';
       return `<div class="container-item">
         <div class="container-status status-${cls}"></div>
         <div class="container-name">${esc(c.name)}</div>
@@ -1308,7 +1430,7 @@ async function fetchDocker() {
 // --- Docker Actions ---
 async function dockerAction(id, action) {
   try {
-    const r = await fetch(API + '/docker/' + id + '/' + action, { method: 'POST' });
+    const r = await authFetch(API + '/docker/' + id + '/' + action, { method: 'POST' });
     if (!r.ok) throw new Error('Action failed');
     setTimeout(fetchDocker, 1000);
   } catch (e) {
@@ -1323,7 +1445,7 @@ async function viewLogs(id, name) {
   document.getElementById('log-content').textContent = '加载中...';
   document.getElementById('log-modal').classList.add('active');
   try {
-    const r = await fetch(API + '/docker/' + id + '/logs?tail=200');
+    const r = await authFetch(API + '/docker/' + id + '/logs?tail=200');
     const d = await r.json();
     document.getElementById('log-content').textContent = d.logs || '暂无日志';
   } catch (e) {
@@ -1342,7 +1464,7 @@ document.getElementById('log-modal').addEventListener('click', function(e) {
 // --- Fetch Processes ---
 async function fetchProcesses() {
   try {
-    const r = await fetch(API + '/processes');
+    const r = await authFetch(API + '/processes');
     const d = await r.json();
     const el = document.getElementById('proc-body');
     if (!d.processes || d.processes.length === 0) {
@@ -1380,7 +1502,7 @@ async function fetchProcesses() {
 // --- Fetch History ---
 async function fetchHistory() {
   try {
-    const r = await fetch(API + '/history');
+    const r = await authFetch(API + '/history');
     const d = await r.json();
     if (!d.history || d.history.length === 0) return;
     trendChart.data.labels = d.history.map(h => {
@@ -1406,7 +1528,7 @@ async function fetchLogs() {
     if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
     if (source) url += '&source=' + source;
     if (level) url += '&level=' + level;
-    const r = await fetch(url);
+    const r = await authFetch(url);
     const d = await r.json();
     const el = document.getElementById('log-body');
     if (!d.logs || d.logs.length === 0) {
@@ -1433,7 +1555,7 @@ async function fetchLogs() {
 
 async function fetchLogStats() {
   try {
-    const r = await fetch(API + '/logs/stats');
+    const r = await authFetch(API + '/logs/stats');
     const d = await r.json();
     const total = Object.values(d.by_level).reduce((a, b) => a + b, 0);
     document.getElementById('log-total').textContent = total;
@@ -1451,7 +1573,7 @@ let opsHistory = [];
 
 async function fetchPresets() {
   try {
-    const r = await fetch(API + '/ops/presets');
+    const r = await authFetch(API + '/ops/presets');
     const d = await r.json();
     opsPresets = d.presets;
     const el = document.getElementById('ops-presets');
@@ -1482,7 +1604,7 @@ async function executePreset(id) {
   btns.forEach(b => { if (b.textContent === preset.name) b.classList.add('active'); });
 
   try {
-    const r = await fetch(API + '/ops/execute', {
+    const r = await authFetch(API + '/ops/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ preset_id: id }),
@@ -1517,23 +1639,24 @@ function renderOpsHistory() {
     ).join('');
 }
 
-// --- Polling ---
-fetchSystem();
-fetchNetwork();
-fetchDocker();
-fetchProcesses();
-fetchHistory();
-fetchLogs();
-fetchLogStats();
-fetchPresets();
-
-setInterval(fetchSystem, 3000);
-setInterval(fetchNetwork, 3000);
-setInterval(fetchDocker, 10000);
-setInterval(fetchProcesses, 5000);
-setInterval(fetchHistory, 30000);
-setInterval(fetchLogs, 30000);
-setInterval(fetchLogStats, 30000);
+// --- Init ---
+(function init() {
+  document.getElementById('login-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('login-username').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  const token = getToken();
+  if (token) {
+    authFetch(API + '/auth/me').then(r => {
+      if (r.ok) { showDashboard(); }
+      else { clearAuth(); showLoginPage(); }
+    }).catch(() => { clearAuth(); showLoginPage(); });
+  } else {
+    showLoginPage();
+  }
+})();
 </script>
 </body>
 </html>

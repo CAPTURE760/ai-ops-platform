@@ -5,3 +5,5 @@ docker==7.1.0
 pydantic==2.13.4
 requests==2.33.1
 starlette==1.0.0
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0

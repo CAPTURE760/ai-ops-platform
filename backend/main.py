@@ -5,10 +5,13 @@ import sqlite3
 import threading
 import subprocess
 from contextlib import contextmanager
-from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from datetime import datetime, timedelta
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from passlib.context import CryptContext
+from jose import jwt, JWTError
 import psutil
 import docker
 
@@ -26,6 +29,49 @@ app.add_middleware(
 )
 
 DB_PATH = "/data/ops.db" if psutil.os.path.exists("/data") else "ops.db"
+
+# --- Auth ---
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
+ALGORITHM = "HS256"
+TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "24"))
+ROOT_USER = os.getenv("ROOT_USER", "lqr552200")
+ROOT_PASSWORD = os.getenv("ROOT_PASSWORD", "lqr520...")
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        role = payload.get("role")
+        if not username:
+            raise HTTPException(status_code=401, detail="无效的认证凭证")
+        return {"username": username, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token 已过期或无效")
+
+
+def require_root(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "root":
+        raise HTTPException(status_code=403, detail="需要 root 权限")
+    return current_user
 
 # --- Database ---
 
@@ -57,7 +103,26 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(ts DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_source ON logs(source)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'viewer',
+                created_at REAL NOT NULL
+            )
+        """)
         conn.commit()
+
+    # Auto-create root user on first run
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM users WHERE username = ?", (ROOT_USER,)).fetchone():
+            conn.execute(
+                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+                (ROOT_USER, hash_password(ROOT_PASSWORD), "root", time.time()),
+            )
+            conn.commit()
+            logger.info(f"Created root user: {ROOT_USER}")
 
 @contextmanager
 def get_db():
@@ -179,8 +244,29 @@ def root():
     return {"message": "AI Ops Platform 运行中"}
 
 
+@app.post("/auth/login")
+def login(body: dict):
+    username = body.get("username", "").strip()
+    password = body.get("password", "")
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="用户名和密码不能为空")
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT username, password_hash, role FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    if not row or not verify_password(password, row[1]):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    token = create_access_token({"sub": row[0], "role": row[2]})
+    return {"access_token": token, "token_type": "bearer", "username": row[0], "role": row[2]}
+
+
+@app.get("/auth/me")
+def get_me(current_user: dict = Depends(get_current_user)):
+    return {"username": current_user["username"], "role": current_user["role"]}
+
+
 @app.get("/system")
-def get_system_info():
+def get_system_info(current_user: dict = Depends(get_current_user)):
     return {
         "cpu": psutil.cpu_percent(interval=0.5),
         "memory": psutil.virtual_memory().percent,
@@ -189,7 +275,7 @@ def get_system_info():
 
 
 @app.get("/network")
-def get_network():
+def get_network(current_user: dict = Depends(get_current_user)):
     global _prev_net
     net = psutil.net_io_counters()
     with _net_lock:
@@ -205,7 +291,7 @@ def get_network():
 
 
 @app.get("/docker")
-def get_docker_containers():
+def get_docker_containers(current_user: dict = Depends(get_current_user)):
     try:
         client = docker.from_env()
         containers = []
@@ -225,7 +311,7 @@ def get_docker_containers():
 
 
 @app.post("/docker/{container_id}/{action}")
-def docker_action(container_id: str, action: str):
+def docker_action(container_id: str, action: str, current_user: dict = Depends(require_root)):
     if action not in ("start", "stop", "restart"):
         raise HTTPException(status_code=400, detail="Invalid action")
     try:
@@ -241,7 +327,7 @@ def docker_action(container_id: str, action: str):
 
 
 @app.get("/docker/{container_id}/logs")
-def docker_logs(container_id: str, tail: int = 100):
+def docker_logs(container_id: str, tail: int = 100, current_user: dict = Depends(get_current_user)):
     try:
         client = docker.from_env()
         container = client.containers.get(container_id)
@@ -255,7 +341,7 @@ def docker_logs(container_id: str, tail: int = 100):
 
 
 @app.get("/processes")
-def get_top_processes():
+def get_top_processes(current_user: dict = Depends(get_current_user)):
     procs = []
     for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
         try:
@@ -268,7 +354,7 @@ def get_top_processes():
 
 
 @app.get("/history")
-def get_history():
+def get_history(current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         rows = conn.execute(
             "SELECT ts, cpu, memory, disk, net_sent, net_recv FROM metrics ORDER BY ts DESC LIMIT 60"
@@ -283,7 +369,7 @@ def get_history():
 # --- Log Endpoints ---
 
 @app.get("/logs")
-def get_logs(source: str = None, level: str = None, keyword: str = None, limit: int = 100, offset: int = 0):
+def get_logs(source: str = None, level: str = None, keyword: str = None, limit: int = 100, offset: int = 0, current_user: dict = Depends(get_current_user)):
     query = "SELECT ts, source, level, message, container FROM logs WHERE 1=1"
     params = []
     if source:
@@ -307,7 +393,7 @@ def get_logs(source: str = None, level: str = None, keyword: str = None, limit: 
 
 
 @app.get("/logs/search")
-def search_logs(keyword: str, source: str = None, limit: int = 50):
+def search_logs(keyword: str, source: str = None, limit: int = 50, current_user: dict = Depends(get_current_user)):
     query = "SELECT ts, source, level, message, container FROM logs WHERE message LIKE ?"
     params = [f"%{keyword}%"]
     if source:
@@ -325,7 +411,7 @@ def search_logs(keyword: str, source: str = None, limit: int = 50):
 
 
 @app.get("/logs/stats")
-def get_log_stats():
+def get_log_stats(current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         # Count by source
         source_rows = conn.execute(
@@ -513,12 +599,12 @@ def _run_preset(preset_id: str) -> dict:
 
 
 @app.get("/ops/presets")
-def get_preset_commands():
+def get_preset_commands(current_user: dict = Depends(get_current_user)):
     return {"presets": PRESET_COMMANDS}
 
 
 @app.post("/ops/execute")
-def execute_command(body: dict):
+def execute_command(body: dict, current_user: dict = Depends(require_root)):
     preset_id = body.get("preset_id", "").strip()
 
     if preset_id:
